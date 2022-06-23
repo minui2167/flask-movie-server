@@ -2,6 +2,8 @@ from flask import Flask
 from flask_jwt_extended import JWTManager
 from flask_restful import Api
 from config import Config
+from resources.movie import MovieListResource, MovieResource
+from resources.rating import RatingListResource
 from resources.user import UserLoginResource, UserLogoutResource, UserRegisterResource, jwt_blacklist
 
 app = Flask(__name__)
@@ -21,6 +23,9 @@ def check_if_token_is_revoked(jwt_header, jwt_payload):
 api.add_resource(UserRegisterResource, '/users/register')
 api.add_resource(UserLoginResource,'/users/login')
 api.add_resource(UserLogoutResource, '/users/logout')
+api.add_resource(MovieListResource,'/movie')
+api.add_resource(MovieResource, '/movie/<int:movie_id>')
+api.add_resource(RatingListResource,'/rating')
 
 if __name__ == '__main__':
     app.run()

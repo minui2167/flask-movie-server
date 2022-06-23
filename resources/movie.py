@@ -8,25 +8,31 @@ from mysql.connector.errors import Error
 from mysql_connection import get_connection
 import mysql.connector
 
-class MovieListResource(Resource):
+class MovieListResource(Resource) :
 
-    def get(self):
-
+    def get(self) :
         # 1. 클라이언트로부터 데이터 받아온다.
+        # ?offset=0&limit=25
+
         offset = request.args['offset']
         limit = request.args['limit']
         order = request.args['order']
 
+        # 2. 디비로부터 영화 가져온다.
+        # 2. 디비로부터 내 메모를 가져온다.
         try :
             connection = get_connection()
 
-            query = '''select m.title, count(m.id) as cnt, AVG(rating) as avg
-                    from movie as m
-                    left join rating as r
-                    on m.id = r.movie_id
+            query = '''select m.id, m.title, 
+                    count(r.movieId) as cnt, ifnull( avg(r.rating) , 0) as avg
+                    from movie m
+                    left join rating r 
+                    on m.id = r.movieId
                     group by m.id
-                    order by '''+order+''' desc
+                    order by ''' + order + ''' desc
                     limit '''+offset+''' , '''+limit+''';'''
+            
+            # record = (user_id,)
 
             # select 문은, dictionary = True 를 해준다.
             cursor = connection.cursor(dictionary = True)
@@ -38,13 +44,14 @@ class MovieListResource(Resource):
 
             print(result_list)
 
-            # Decimal to String
+            # 중요! 디비에서 가져온 timestamp 는 
+            # 파이썬의 datetime 으로 자동 변경된다.
+            # 문제는! 이데이터를 json 으로 바로 보낼수 없으므로,
+            # 문자열로 바꿔서 다시 저장해서 보낸다.
             i = 0
             for record in result_list :
                 result_list[i]['avg'] = float(record['avg'])
-                i = i + 1            
-
-            print(result_list)
+                i = i + 1                
 
             cursor.close()
             connection.close()
@@ -54,29 +61,35 @@ class MovieListResource(Resource):
             cursor.close()
             connection.close()
 
-            return {"error": str(e)}, 503
+            return {"error" : str(e), 'error_no' : 20}, 503
 
 
-        return { "result" : "success" , 
-                "count" : len(result_list),
-                "result_list" : result_list}, 200
+        return {'result' : 'success',
+                'count' : len(result_list) ,
+                'items' : result_list}
 
-class MovieResource(Resource):
-     
-    def get(self, movie_id):
 
+
+class MovieResource(Resource) :
+
+    def get(self, movie_id) :
+
+        # 1. 디비로부터 영화 상세 정보 가져온다.
         try :
             connection = get_connection()
 
-            query = '''select m.*, AVG(rating) as avg, count(m.id) as cnt
-                    from movie as m
-                    left join rating as r
-                    on m.id = r.movie_id
-                    group by m.id having m.id = %s;'''
+            query = '''select m.*,
+                    count(r.movieId) as cnt, ifnull( avg(r.rating) , 0 ) as avg
+                    from movie m 
+                    left join rating r 
+                    on m.id = r.movieId 
+                    where m.id = %s
+                    group by m.id;'''
+            
+            record = (movie_id,)
 
             # select 문은, dictionary = True 를 해준다.
             cursor = connection.cursor(dictionary = True)
-            record = (movie_id, )
 
             cursor.execute(query, record)
 
@@ -85,15 +98,16 @@ class MovieResource(Resource):
 
             print(result_list)
 
-            # Decimal to String
+            # 중요! 디비에서 가져온 timestamp 는 
+            # 파이썬의 datetime 으로 자동 변경된다.
+            # 문제는! 이데이터를 json 으로 바로 보낼수 없으므로,
+            # 문자열로 바꿔서 다시 저장해서 보낸다.
             i = 0
             for record in result_list :
+                result_list[i]['avg'] = float(record['avg'])
                 result_list[i]['year'] = record['year'].isoformat()
                 result_list[i]['createdAt'] = record['createdAt'].isoformat()
-                result_list[i]['avg'] = str(record['avg'])
-                i = i + 1            
-
-            print(result_list)
+                i = i + 1                
 
             cursor.close()
             connection.close()
@@ -103,9 +117,7 @@ class MovieResource(Resource):
             cursor.close()
             connection.close()
 
-            return {"error": str(e)}, 503
+            return {"error" : str(e), 'error_no' : 20}, 503
 
-
-        return { "result" : "success" , 
-                "count" : len(result_list),
-                "result_list" : result_list}, 200
+        return {'result' : 'success' ,
+                'item' : result_list[0]}
